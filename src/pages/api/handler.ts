@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import axios from "axios";
 import cheerio from "cheerio";
+import Diff from 'text-diff';
 import { Redis } from '@upstash/redis';
 import { NextApiRequest, NextApiResponse } from "next";
 
@@ -31,12 +32,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       content.push($(el).text())
     });
 
+    // cut off text from food allergy warning and below
     const end = content.findIndex(e => e.includes('Consuming raw or undercooked meats'));
-
     content = content.slice(0, end);
 
     const str = content.join();
 
+    // match menu item groups
     const regex = /(([A-Z]+?[\s,\-,&]+){1,})[a-z,à-ÿ,' ',\d,&,-]+/gm;
 
     // iterate over regex match groups, remove consecutive whitespaces
@@ -46,15 +48,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // await redis.set('content', result);
 
-    const stored = await redis.get('content');
+    let stored = await redis.get('content') as Array<string>;
 
-    const message_body = result.join('\n').slice(0, 300);
+    const stored_text = stored.join()
+      .replace('ISLAND CREEK OYSTERS chili oil, meyer lemon mignonette 4ea', 'CRISPY HALIBUT sriracha sauce 8')
+      .replace('DUCK FAT POTATOES parsley, garlic aioli 9', 'BRAISED CABBAGE SLAW')
 
-    // await twilio_client.messages.create({
-    //   body: message_body,
-    //   to: '+14152331791',
-    //   from: '+18558193039'
-    // });
+    const diff = new Diff();
+    let text_diff = diff.main(stored_text, result.join());
+    diff.cleanupSemantic(text_diff)
+    const html: string = diff.prettyHtml(text_diff);
+
+    let ins = Array.from(html.matchAll(/<ins>(.+?)<\/ins>/g), m => m[1]);
+
+    const response_body = ins.filter(e => (/^[A-Z]+/.test(e)) && e.length > 3).join('\n')
+
+    console.log(response_body);
+
+    const message_body = "New items at Bar Bete:\n" + response_body.slice(0, 300);
+
+    await twilio_client.messages.create({
+      body: message_body,
+      to: '+14152331791',
+      from: '+18558193039'
+    });
 
     res.status(200).json(message_body);
   } catch (e) {
