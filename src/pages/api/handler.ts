@@ -1,12 +1,16 @@
 import axios from "axios";
 import cheerio from "cheerio";
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextRequest, NextResponse } from "next/server";
+
+export const config = {
+  runtime: 'edge'
+}
 
 const URL = 'https://www.barbete.com/mobile-menu';
 
 // The DOM structure of this page is very messy, hence all the manual string juggling/parsing
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req: NextRequest) {
   try {
     const { data } = await axios.get(URL);
 
@@ -31,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(result)
 
-    res.status(200).json(result);
+    NextResponse.json(result);
   } catch (e) {
     throw e;
   }
