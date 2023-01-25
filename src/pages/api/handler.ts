@@ -1,12 +1,17 @@
 import twilio from 'twilio';
 import axios from "axios";
 import cheerio from "cheerio";
+import { Redis } from '@upstash/redis';
 import { NextApiRequest, NextApiResponse } from "next";
 
 const TWILIO_ACCOUNT_SID = 'ACd998ee990bc7bd549b1ee1aa1eeffe24';
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
 
 const twilio_client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN
+});
 
 const URL = 'https://www.barbete.com/mobile-menu';
 
@@ -38,13 +43,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .map(e => e.trim())
       .map(e => e.replace(/\s\s+/g, ' '));
 
+    // await redis.set('content', result);
+
+    const stored = await redis.get('content');
+
     const message_body = result.join('\n').slice(0, 300);
 
-    await twilio_client.messages.create({
-      body: message_body,
-      to: '+14152331791',
-      from: '+18558193039'
-    });
+    // await twilio_client.messages.create({
+    //   body: message_body,
+    //   to: '+14152331791',
+    //   from: '+18558193039'
+    // });
 
     res.status(200).json(message_body);
   } catch (e) {
