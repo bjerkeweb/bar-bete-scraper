@@ -2,7 +2,7 @@ name: hourly-cron
 on:
   schedule:
     # run once an hour
-    - cron: '0 */1 * * *'
+    - cron: '4 * * * *'
 jobs:
   cron:
     runs-on: ubuntu-latest
