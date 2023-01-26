@@ -63,7 +63,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const response_body = ins.filter(e => (/^[A-Z]+/.test(e)) && e.length > 3).join('\n')
 
-    console.log(response_body);
+    // console.log(response_body);
 
     const message_body = "New items at Bar Bete:\n" + response_body.slice(0, 300);
 
