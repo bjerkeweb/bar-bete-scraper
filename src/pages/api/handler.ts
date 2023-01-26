@@ -48,9 +48,9 @@ export default async function handler(
       .map((e) => e.trim())
       .map((e) => e.replace(/\s\s+/g, ' '));
 
-    let storedpage_content = (await redis.get('content')) as Array<string>;
+    let storedpage_content = await redis.get<Array<string>>('content');
 
-    const html = getDiffHtml(storedpage_content.join(), parsed.join());
+    const html = getDiffHtml(storedpage_content!.join(), parsed.join());
     const menu_inserts = getInserts(html);
 
     const message_body = getMessageBody(menu_inserts);
