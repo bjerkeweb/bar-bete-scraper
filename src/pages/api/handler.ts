@@ -1,9 +1,9 @@
 import twilio from 'twilio';
-import axios from "axios";
-import cheerio from "cheerio";
+import axios from 'axios';
+import cheerio from 'cheerio';
 import Diff from 'text-diff';
 import { Redis } from '@upstash/redis';
-import { NextApiRequest, NextApiResponse } from "next";
+import { NextApiRequest, NextApiResponse } from 'next';
 
 const TWILIO_ACCOUNT_SID = 'ACd998ee990bc7bd549b1ee1aa1eeffe24';
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
@@ -12,69 +12,98 @@ const twilio_client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 const redis = new Redis({
   // @ts-ignore
   url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
 const URL = 'https://www.barbete.com/mobile-menu';
 
 // The DOM structure of this page is very messy, hence all the manual string juggling/parsing
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   try {
-
     const { data } = await axios.get(URL);
 
     const $ = cheerio.load(data);
 
-    let content: string[] = [];
+    let page_content: string[] = [];
 
     $('.sqs-block-content > p').each((_idx, el) => {
-      content.push($(el).text())
+      page_content.push($(el).text());
     });
 
     // cut off text from food allergy warning and below
-    const end = content.findIndex(e => e.includes('Consuming raw or undercooked meats'));
-    content = content.slice(0, end);
-
-    const str = content.join();
+    const end = page_content.findIndex((e) =>
+      e.includes('Consuming raw or undercooked meats'),
+    );
+    page_content = page_content.slice(0, end);
 
     // match menu item groups
     const regex = /(([A-Z]+?[\s,\-,&]+){1,})[a-z,à-ÿ,' ',\d,&,-]+/gm;
 
     // iterate over regex match groups, remove consecutive whitespaces
-    const result = Array.from(str.matchAll(regex), m => m[0])
-      .map(e => e.trim())
-      .map(e => e.replace(/\s\s+/g, ' '));
+    let parsed = Array.from(page_content.join().matchAll(regex), (m) => m[0])
+      .map((e) => e.trim())
+      .map((e) => e.replace(/\s\s+/g, ' '));
 
-    // await redis.set('content', result);
+    let storedpage_content = (await redis.get('content')) as Array<string>;
 
-    let stored = await redis.get('content') as Array<string>;
+    // const stored_text = storedpage_content
+    //   .join()
+    //   .replace(
+    //     'ISLAND CREEK OYSTERS chili oil, meyer lemon mignonette 4ea',
+    //     'CRISPY HALIBUT sriracha sauce 8',
+    //   );
+    // .replace(
+    //   'DUCK FAT POTATOES parsley, garlic aioli 9',
+    //   'BRAISED CABBAGE SLAW',
+    // );
 
-    const stored_text = stored.join()
-      .replace('ISLAND CREEK OYSTERS chili oil, meyer lemon mignonette 4ea', 'CRISPY HALIBUT sriracha sauce 8')
-      .replace('DUCK FAT POTATOES parsley, garlic aioli 9', 'BRAISED CABBAGE SLAW')
+    const html = getDiffHtml(storedpage_content.join(), parsed.join());
+    const menu_inserts = getInserts(html);
 
-    const diff = new Diff();
-    let text_diff = diff.main(stored_text, result.join());
-    diff.cleanupSemantic(text_diff)
-    const html: string = diff.prettyHtml(text_diff);
+    const message_body = getMessageBody(menu_inserts);
 
-    let ins = Array.from(html.matchAll(/<ins>(.+?)<\/ins>/g), m => m[1]);
-
-    const response_body = ins.filter(e => (/^[A-Z]+/.test(e)) && e.length > 3).join('\n')
-
-    // console.log(response_body);
-
-    const message_body = "New items at Bar Bete:\n" + response_body.slice(0, 300);
-
-    await twilio_client.messages.create({
-      body: message_body,
-      to: '+14152331791',
-      from: '+18558193039'
-    });
+    if (menu_inserts.length) {
+      await sendSMS(message_body);
+      await redis.set('content', parsed);
+    }
 
     res.status(200).json(message_body);
   } catch (e) {
     throw e;
   }
+}
+
+function getDiffHtml(a: string, b: string) {
+  const diff = new Diff();
+  let text_diff = diff.main(a, b);
+  diff.cleanupSemantic(text_diff);
+  const html: string = diff.prettyHtml(text_diff);
+  return html;
+}
+
+function getInserts(str: string) {
+  return Array.from(str.matchAll(/<ins>(.+?)<\/ins>/g), (m) => m[1]);
+}
+
+async function sendSMS(message: string) {
+  await twilio_client.messages.create({
+    body: message,
+    to: '+14152331791',
+    from: '+18558193039',
+  });
+}
+
+function getMessageBody(menu_inserts: string[], length?: number) {
+  const response_body = menu_inserts
+    .filter((e) => /^[A-Z]+/.test(e) && e.length > 3)
+    .join('\n');
+
+  const msg =
+    'New items at Bar Bete:\n' + response_body.slice(0, length ?? 300);
+
+  return msg;
 }
