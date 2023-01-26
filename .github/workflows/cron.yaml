@@ -1,0 +1,13 @@
+name: hourly-cron
+on:
+  schedule:
+    # run once an hour
+    - cron: '0 */1 * * *'
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call API route
+        run: |
+          curl --request GET \
+          --url 'https://bar-bete-scraper.vercel.app/api/handler'
