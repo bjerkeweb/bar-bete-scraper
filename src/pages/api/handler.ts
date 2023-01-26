@@ -5,8 +5,7 @@ import Diff from 'text-diff';
 import { Redis } from '@upstash/redis';
 import { NextApiRequest, NextApiResponse } from 'next';
 
-const TWILIO_ACCOUNT_SID = 'ACd998ee990bc7bd549b1ee1aa1eeffe24';
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const { TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN } = process.env;
 
 const twilio_client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 const redis = new Redis({
