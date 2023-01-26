@@ -50,17 +50,6 @@ export default async function handler(
 
     let storedpage_content = (await redis.get('content')) as Array<string>;
 
-    // const stored_text = storedpage_content
-    //   .join()
-    //   .replace(
-    //     'ISLAND CREEK OYSTERS chili oil, meyer lemon mignonette 4ea',
-    //     'CRISPY HALIBUT sriracha sauce 8',
-    //   );
-    // .replace(
-    //   'DUCK FAT POTATOES parsley, garlic aioli 9',
-    //   'BRAISED CABBAGE SLAW',
-    // );
-
     const html = getDiffHtml(storedpage_content.join(), parsed.join());
     const menu_inserts = getInserts(html);
 
@@ -92,8 +81,8 @@ function getInserts(str: string) {
 async function sendSMS(message: string) {
   await twilio_client.messages.create({
     body: message,
-    to: '+14152331791',
-    from: '+18558193039',
+    to: process.env.SMS_PHONE_NUM!,
+    from: process.env.TWILIO_PHONE_NUM,
   });
 }
 
