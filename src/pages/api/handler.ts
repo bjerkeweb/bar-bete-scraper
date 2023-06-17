@@ -28,7 +28,7 @@ export default async function handler(
 
     let page_content: string[] = [];
 
-    $('.sqs-block-content > p').each((_idx, el) => {
+    $('.sqs-block-content p').each((_idx, el) => {
       page_content.push($(el).text());
     });
 
